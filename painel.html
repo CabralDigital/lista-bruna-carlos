@@ -1,0 +1,320 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Painel dos Noivos | Bruna & Carlos</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --t:#b9532b;
+  --d:#7f412d;
+  --bg:#faf6f0;
+  --line:#e9d6c7;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:var(--bg);
+  color:#463b34;
+  font-family:Georgia,serif;
+}
+header{
+  background:white;
+  text-align:center;
+  padding:35px 15px;
+  border-bottom:1px solid var(--line);
+}
+.eyebrow{
+  color:var(--t);
+  font:12px Arial,sans-serif;
+  letter-spacing:3px;
+}
+h1{
+  color:var(--t);
+  font-size:clamp(36px,7vw,55px);
+  font-weight:400;
+  font-style:italic;
+  margin:10px 0;
+}
+header p{color:#806a5d}
+main{
+  max-width:900px;
+  margin:35px auto;
+  padding:0 16px 60px;
+}
+.card{
+  background:white;
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:24px;
+  margin-bottom:18px;
+}
+input{
+  width:100%;
+  padding:14px;
+  border:1px solid #d7b9a6;
+  border-radius:8px;
+  font-size:15px;
+  margin:8px 0 16px;
+}
+button{
+  background:var(--t);
+  color:white;
+  border:0;
+  border-radius:8px;
+  padding:13px 18px;
+  font-weight:bold;
+  cursor:pointer;
+}
+button:disabled{opacity:.6;cursor:wait}
+.secondary{background:#ede2d8;color:#5b4439}
+.hidden{display:none!important}
+.message{color:var(--d);font:14px Arial,sans-serif}
+.stats{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:12px;
+  margin-bottom:20px;
+}
+.stat{
+  background:white;
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:20px;
+}
+.stat strong{
+  display:block;
+  font-size:30px;
+  color:var(--t);
+}
+.stat span{
+  font:13px Arial,sans-serif;
+  color:#806a5d;
+}
+.gift{
+  background:white;
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:18px;
+  margin-bottom:12px;
+}
+.gift h3{
+  font-weight:400;
+  font-size:20px;
+  margin:5px 0 12px;
+}
+.gift p{
+  margin:6px 0;
+  color:#806a5d;
+  font-size:14px;
+}
+.tag{
+  color:#3c7453;
+  font:12px Arial,sans-serif;
+}
+.top{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+footer{
+  text-align:center;
+  color:#a38d7c;
+  padding:25px;
+  font:12px Arial,sans-serif;
+}
+@media(max-width:500px){
+  .card{padding:18px}
+  .stats{gap:8px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="eyebrow">ÁREA EXCLUSIVA DOS NOIVOS</div>
+  <h1>Bruna & Carlos</h1>
+  <p>Acompanhe com carinho os presentes escolhidos.</p>
+</header>
+
+<main>
+
+<section id="login" class="card">
+  <h2 style="color:#b9532b;font-weight:400">Bem-vindos!</h2>
+  <p>Entre para consultar as reservas da sua lista de presentes.</p>
+
+  <form id="loginForm">
+    <label for="username">Nome de usuário</label>
+    <input id="username" value="brunaecarlos" required autocomplete="username">
+
+    <label for="password">Senha</label>
+    <input id="password" type="password" required
+      autocomplete="current-password" placeholder="Digite sua senha">
+
+    <button id="loginBtn" type="submit" style="width:100%">
+      Entrar no painel
+    </button>
+  </form>
+  <p id="loginMessage" class="message"></p>
+</section>
+
+<section id="dashboard" class="hidden">
+  <div class="top">
+    <h2 style="font-weight:400;color:#b9532b">Suas reservas</h2>
+    <button class="secondary" id="logoutBtn">Sair</button>
+  </div>
+
+  <div class="stats">
+    <div class="stat">
+      <strong id="total">0</strong>
+      <span>Presentes escolhidos</span>
+    </div>
+    <div class="stat">
+      <strong id="available">0</strong>
+      <span>Presentes disponíveis</span>
+    </div>
+  </div>
+
+  <div class="top">
+    <h2 style="font-weight:400">Lista de reservas</h2>
+    <button id="refreshBtn">Atualizar</button>
+  </div>
+
+  <p id="panelMessage" class="message"></p>
+  <div id="reservations"></div>
+</section>
+
+</main>
+
+<footer>Com carinho, Bruna & Carlos</footer>
+
+<script>
+const URL = "https://ziqhqqogwhygpifnfnvu.supabase.co";
+const KEY = "sb_publishable_VctACA1BGNYV_wHrdMNuvg_ge87IJQW";
+
+const db = window.supabase.createClient(URL, KEY);
+
+const login = document.querySelector("#login");
+const dashboard = document.querySelector("#dashboard");
+const loginMessage = document.querySelector("#loginMessage");
+const panelMessage = document.querySelector("#panelMessage");
+
+function showPanel(connected) {
+  login.classList.toggle("hidden", connected);
+  dashboard.classList.toggle("hidden", !connected);
+}
+
+async function loadReservations() {
+  panelMessage.textContent = "Atualizando reservas...";
+  const {data,error} = await db
+    .from("presentes")
+    .select("id,nome,status,reservado_por,reservado_em")
+    .order("id");
+
+  if(error) {
+    panelMessage.textContent =
+      "Não foi possível carregar as reservas. Verifique o acesso.";
+    return;
+  }
+
+  const reserved = data.filter(p => p.status === "indisponivel");
+  const available = data.filter(p => p.status === "disponivel");
+
+  document.querySelector("#total").textContent = reserved.length;
+  document.querySelector("#available").textContent = available.length;
+
+  const list = document.querySelector("#reservations");
+  list.replaceChildren();
+
+  if(!reserved.length) {
+    panelMessage.textContent = "Ainda não existem presentes escolhidos.";
+    return;
+  }
+
+  panelMessage.textContent = "";
+
+  reserved.forEach(p => {
+    const card = document.createElement("article");
+    card.className = "gift";
+
+    const tag = document.createElement("div");
+    tag.className = "tag";
+    tag.textContent = "● Presente escolhido";
+
+    const title = document.createElement("h3");
+    title.textContent = p.nome;
+
+    const guest = document.createElement("p");
+    guest.textContent = "Convidado: " + (p.reservado_por || "Não informado");
+
+    const date = document.createElement("p");
+    date.textContent = "Data: " + (
+      p.reservado_em
+        ? new Date(p.reservado_em).toLocaleString("pt-BR")
+        : "Não informada"
+    );
+
+    card.append(tag,title,guest,date);
+    list.append(card);
+  });
+}
+
+document.querySelector("#loginForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+
+  const btn = document.querySelector("#loginBtn");
+  btn.disabled = true;
+  loginMessage.textContent = "Verificando acesso...";
+
+  try {
+    const {data,error} = await db.functions.invoke("login-noivos",{
+      body:{
+        username:document.querySelector("#username").value.trim(),
+        password:document.querySelector("#password").value
+      }
+    });
+
+    if(error || !data?.access_token || !data?.refresh_token) {
+      throw new Error("Não foi possível entrar.");
+    }
+
+    const {error:sessionError} = await db.auth.setSession({
+      access_token:data.access_token,
+      refresh_token:data.refresh_token
+    });
+
+    if(sessionError) throw sessionError;
+
+    document.querySelector("#password").value = "";
+    showPanel(true);
+    await loadReservations();
+
+  } catch(err) {
+    loginMessage.textContent = "Usuário ou senha inválidos. Confira os dados e tente novamente.";
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.querySelector("#refreshBtn").addEventListener("click",loadReservations);
+
+document.querySelector("#logoutBtn").addEventListener("click",async()=>{
+  await db.auth.signOut();
+  showPanel(false);
+  loginMessage.textContent = "Você saiu do painel.";
+});
+
+(async()=>{
+  const {data} = await db.auth.getSession();
+  if(data.session) {
+    showPanel(true);
+    await loadReservations();
+  }
+})();
+</script>
+</body>
+</html>
